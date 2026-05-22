@@ -1,5 +1,6 @@
-// Hi-fi: Knowledge — live data from Supabase knowledge table.
-// Left: tree of RSL pages + text search. Right: doc reader.
+// Hi-fi: Knowledge — live data from Supabase.
+// Shows both the Confluence-synced knowledge table (Acme Co)
+// and the braindance documents table (Standards library).
 
 const SUPABASE_URL  = 'https://qignvmxqgwpgzdoughcf.supabase.co'
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpZ252bXhxZ3dwZ3pkb3VnaGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNzg5NzcsImV4cCI6MjA5NDk1NDk3N30.EkfZfNKKj-WAM21T6tDusPsAuySFu9dfAnhPqYIOKp8'
@@ -13,22 +14,28 @@ async function kbFetch(path) {
 }
 
 function Knowledge({ initialDocId = null }) {
-  const [pages, setPages]         = React.useState([])
-  const [activeId, setActiveId]   = React.useState(initialDocId)
-  const [doc, setDoc]             = React.useState(null)
+  const [kbPages, setKbPages]       = React.useState([])   // knowledge table
+  const [stdPages, setStdPages]     = React.useState([])   // documents table
+  const [activeId, setActiveId]     = React.useState(initialDocId)
+  const [activeSource, setActiveSource] = React.useState('knowledge') // 'knowledge' | 'documents'
+  const [doc, setDoc]               = React.useState(null)
   const [docLoading, setDocLoading] = React.useState(false)
-  const [search, setSearch]       = React.useState('')
-  const [loading, setLoading]     = React.useState(true)
+  const [search, setSearch]         = React.useState('')
+  const [loading, setLoading]       = React.useState(true)
 
-  // Load all pages on mount
+  // Load both sources on mount
   React.useEffect(() => {
-    kbFetch('knowledge?select=id,title,author,updated_at,url&order=title.asc')
-      .then(rows => {
-        setPages(rows)
-        if (!initialDocId && rows.length > 0) setActiveId(rows[0].id)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+    Promise.all([
+      kbFetch('knowledge?select=id,title,author,updated_at,url&order=title.asc').catch(() => []),
+      kbFetch('documents?select=id,file_path,name,doc_type,category,synced_at&order=file_path.asc').catch(() => []),
+    ]).then(([kb, std]) => {
+      setKbPages(kb)
+      setStdPages(std)
+      if (!initialDocId) {
+        if (kb.length > 0) { setActiveId(kb[0].id); setActiveSource('knowledge') }
+        else if (std.length > 0) { setActiveId(std[0].id); setActiveSource('documents') }
+      }
+    }).finally(() => setLoading(false))
   }, [])
 
   // Load doc content when selection changes
@@ -36,29 +43,35 @@ function Knowledge({ initialDocId = null }) {
     if (!activeId) return
     setDocLoading(true)
     setDoc(null)
-    kbFetch(`knowledge?select=id,title,content,url,author,updated_at,tags&id=eq.${activeId}`)
-      .then(rows => setDoc(rows[0] || null))
+    const path = activeSource === 'knowledge'
+      ? `knowledge?select=id,title,content,url,author,updated_at,tags&id=eq.${activeId}`
+      : `documents?select=id,name,file_path,doc_type,category,content,authority,last_reviewed,synced_at&id=eq.${activeId}`
+    kbFetch(path)
+      .then(rows => setDoc(rows[0] ? { ...rows[0], _source: activeSource } : null))
       .catch(console.error)
       .finally(() => setDocLoading(false))
-  }, [activeId])
+  }, [activeId, activeSource])
 
-  useLucide([pages, activeId, search, loading])
+  useLucide([kbPages, stdPages, activeId, search, loading])
 
-  // Filter pages by search query
-  const filtered = search.trim()
-    ? pages.filter(p => p.title.toLowerCase().includes(search.toLowerCase()))
-    : pages
+  const q = search.trim().toLowerCase()
+  const filteredKb  = q ? kbPages.filter(p => (p.title||'').toLowerCase().includes(q)) : kbPages
+  const filteredStd = q ? stdPages.filter(p => (p.name||p.file_path||'').toLowerCase().includes(q)) : stdPages
+
+  const selectDoc = (id, source) => { setActiveId(id); setActiveSource(source) }
 
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0, background: C.bg }}>
       <KbTree
-        pages={filtered}
+        kbPages={filteredKb}
+        stdPages={filteredStd}
         loading={loading}
         activeId={activeId}
-        onSelect={setActiveId}
+        activeSource={activeSource}
+        onSelect={selectDoc}
         search={search}
         onSearch={setSearch}
-        total={pages.length}
+        total={kbPages.length + stdPages.length}
       />
       <KbDoc doc={doc} loading={docLoading} />
       <KbDocSide doc={doc} />
@@ -67,7 +80,7 @@ function Knowledge({ initialDocId = null }) {
 }
 
 // ─── Left sidebar ─────────────────────────────────────────────
-function KbTree({ pages, loading, activeId, onSelect, search, onSearch, total }) {
+function KbTree({ kbPages, stdPages, loading, activeId, activeSource, onSelect, search, onSearch, total }) {
   return (
     <aside style={{
       width: 296, background: '#FFFFFF', borderRight: `1px solid ${C.border}`,
@@ -101,47 +114,54 @@ function KbTree({ pages, loading, activeId, onSelect, search, onSearch, total })
         </div>
       </div>
 
-      {/* Space header */}
-      <div style={{ padding: '4px 16px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Icon name="building-2" size={13} color={C.purple} />
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Acme Co
-        </span>
-        <span style={{ fontSize: 11, color: C.muted, fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
-          {total}
-        </span>
-      </div>
-
-      {/* Page list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 4px 16px' }}>
         {loading ? (
-          <div style={{ padding: '24px 16px', fontSize: 13, color: C.muted, textAlign: 'center' }}>
-            Loading…
-          </div>
-        ) : pages.length === 0 ? (
-          <div style={{ padding: '24px 16px', fontSize: 13, color: C.muted, textAlign: 'center' }}>
-            No results
-          </div>
-        ) : pages.map(page => (
-          <KbTreeItem
-            key={page.id}
-            page={page}
-            active={activeId === page.id}
-            onSelect={onSelect}
-          />
-        ))}
+          <div style={{ padding: '24px 16px', fontSize: 13, color: C.muted, textAlign: 'center' }}>Loading…</div>
+        ) : (
+          <>
+            {/* Acme Co — knowledge table */}
+            <KbSectionHeader icon="building-2" label="Acme Co" count={kbPages.length} />
+            {kbPages.length === 0
+              ? <div style={{ padding: '4px 20px 8px', fontSize: 12, color: C.muted }}>No results</div>
+              : kbPages.map(page => (
+                <KbTreeItem key={page.id} label={page.title} active={activeId === page.id && activeSource === 'knowledge'} onSelect={() => onSelect(page.id, 'knowledge')} icon="file-text" />
+              ))
+            }
+
+            {/* Standards — documents table */}
+            <KbSectionHeader icon="book-open" label="Standards" count={stdPages.length} style={{ marginTop: 12 }} />
+            {stdPages.length === 0
+              ? <div style={{ padding: '4px 20px 8px', fontSize: 12, color: C.muted }}>No results</div>
+              : stdPages.map(page => (
+                <KbTreeItem key={page.id} label={page.name || page.file_path} active={activeId === page.id && activeSource === 'documents'} onSelect={() => onSelect(page.id, 'documents')} icon="book-marked" badge={page.category} />
+              ))
+            }
+          </>
+        )}
       </div>
     </aside>
   )
 }
 
-function KbTreeItem({ page, active, onSelect }) {
+function KbSectionHeader({ icon, label, count, style }) {
+  return (
+    <div style={{ padding: '8px 16px 6px', display: 'flex', alignItems: 'center', gap: 6, ...style }}>
+      <Icon name={icon} size={13} color={C.purple} />
+      <span style={{ fontSize: 12, fontWeight: 600, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.04em', flex: 1 }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 11, color: C.muted, fontFamily: 'JetBrains Mono, monospace' }}>{count}</span>
+    </div>
+  )
+}
+
+function KbTreeItem({ label, active, onSelect, icon = 'file-text', badge }) {
   const [hover, setHover] = React.useState(false)
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={() => onSelect(page.id)}
+      onClick={onSelect}
       style={{
         padding: '6px 8px 6px 20px',
         borderRadius: 6,
@@ -153,14 +173,16 @@ function KbTreeItem({ page, active, onSelect }) {
       {active && (
         <span style={{ position: 'absolute', left: 0, top: 4, bottom: 4, width: 2, background: C.purple, borderRadius: 9999 }} />
       )}
-      <Icon name="file-text" size={13} color={active ? C.purple : C.mutedLight} />
+      <Icon name={icon} size={13} color={active ? C.purple : C.mutedLight} />
       <span style={{
-        fontSize: 13,
-        color: active ? C.purple : C.fg,
+        fontSize: 13, color: active ? C.purple : C.fg,
         fontWeight: active ? 600 : 500,
         flex: 1, minWidth: 0,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>{page.title}</span>
+      }}>{label}</span>
+      {badge && (
+        <span style={{ fontSize: 10, color: C.muted, background: C.bgSoft, padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>{badge}</span>
+      )}
     </div>
   )
 }
@@ -183,23 +205,28 @@ function KbDoc({ doc, loading }) {
     )
   }
 
-  const updatedLabel = doc.updated_at
-    ? new Date(doc.updated_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
+  const isStandard = doc._source === 'documents'
+  const title = isStandard ? (doc.name || doc.file_path) : doc.title
+  const sourceLabel = isStandard ? (doc.doc_type || 'Standard') : 'Confluence'
+  const breadcrumb = isStandard ? (doc.category || 'Standards') : 'Acme Co'
+  const dateVal = isStandard ? doc.synced_at : doc.updated_at
+  const dateLabel = dateVal
+    ? new Date(dateVal).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
     : ''
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: '#FFFFFF' }}>
       <div style={{ padding: '20px 48px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginBottom: 16 }}>
-          <span>📚</span>
-          <a href="#" style={{ color: C.muted, textDecoration: 'none' }}>Acme Co</a>
+          <span>{isStandard ? '📖' : '📚'}</span>
+          <span style={{ color: C.muted }}>{breadcrumb}</span>
           <span>›</span>
-          <span style={{ color: C.fg, fontWeight: 500 }}>{doc.title}</span>
+          <span style={{ color: C.fg, fontWeight: 500 }}>{title}</span>
           <div style={{ flex: 1 }} />
           {doc.url && (
             <a href={doc.url} target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.muted, textDecoration: 'none', fontSize: 12 }}>
-              ↗ Confluence
+              ↗ {isStandard ? 'Source' : 'Confluence'}
             </a>
           )}
         </div>
@@ -211,9 +238,9 @@ function KbDoc({ doc, loading }) {
             display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 8px',
             borderRadius: 4, background: C.bgSoft, color: C.muted, marginBottom: 12,
             textTransform: 'uppercase', letterSpacing: '0.04em',
-          }}>Confluence</span>
+          }}>{sourceLabel}</span>
           <h1 style={{ margin: '12px 0 8px', fontSize: 36, fontWeight: 600, color: C.fg, letterSpacing: '-0.015em', lineHeight: 1.15 }}>
-            {doc.title}
+            {title}
           </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.muted }}>
             {doc.author && (
@@ -223,7 +250,8 @@ function KbDoc({ doc, loading }) {
                 <span style={{ color: C.mutedLight }}>·</span>
               </>
             )}
-            {updatedLabel && <span>Updated {updatedLabel}</span>}
+            {doc.authority && <span>Authority: {doc.authority}</span>}
+            {dateLabel && <span>{isStandard ? 'Synced' : 'Updated'} {dateLabel}</span>}
           </div>
         </div>
 
@@ -283,8 +311,14 @@ function KbDocSide({ doc }) {
               <Eyebrow>Source</Eyebrow>
               <a href={doc.url} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, color: C.purple, textDecoration: 'none' }}>
-                ↗ View in Confluence
+                ↗ {doc._source === 'documents' ? 'View source' : 'View in Confluence'}
               </a>
+            </div>
+          )}
+          {doc.file_path && (
+            <div style={{ marginTop: 24 }}>
+              <Eyebrow>File path</Eyebrow>
+              <div style={{ marginTop: 8, fontSize: 11, color: C.muted, fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-all' }}>{doc.file_path}</div>
             </div>
           )}
 
