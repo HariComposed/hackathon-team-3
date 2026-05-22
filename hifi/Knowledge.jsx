@@ -105,7 +105,7 @@ function KbTree({ pages, loading, activeId, onSelect, search, onSearch, total })
       <div style={{ padding: '4px 16px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
         <Icon name="building-2" size={13} color={C.purple} />
         <span style={{ fontSize: 12, fontWeight: 600, color: C.purple, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          RSL Queensland
+          Acme Co
         </span>
         <span style={{ fontSize: 11, color: C.muted, fontFamily: 'JetBrains Mono, monospace', marginLeft: 'auto' }}>
           {total}
@@ -165,10 +165,8 @@ function KbTreeItem({ page, active, onSelect }) {
   )
 }
 
-// ─── Doc reader ───────────────────────────────────────────────
+// ─── Doc reader (no Icon/useLucide — avoids DOM reconciler crash) ─────────────
 function KbDoc({ doc, loading }) {
-  useLucide([loading])
-
   if (loading) {
     return (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FFF', color: C.muted, fontSize: 14 }}>
@@ -193,24 +191,27 @@ function KbDoc({ doc, loading }) {
     <div style={{ flex: 1, overflowY: 'auto', background: '#FFFFFF' }}>
       <div style={{ padding: '20px 48px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: C.muted, marginBottom: 16 }}>
-          <Icon name="library" size={12} />
-          <a href="#" style={{ color: C.muted, textDecoration: 'none' }}>RSL Queensland</a>
-          <Icon name="chevron-right" size={11} color={C.mutedLight} />
+          <span>📚</span>
+          <a href="#" style={{ color: C.muted, textDecoration: 'none' }}>Acme Co</a>
+          <span>›</span>
           <span style={{ color: C.fg, fontWeight: 500 }}>{doc.title}</span>
           <div style={{ flex: 1 }} />
           {doc.url && (
             <a href={doc.url} target="_blank" rel="noopener noreferrer"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: C.muted, textDecoration: 'none', fontSize: 12 }}>
-              <Icon name="external-link" size={12} /> Confluence
+              ↗ Confluence
             </a>
           )}
         </div>
       </div>
 
       <article style={{ maxWidth: 760, margin: '0 auto', padding: '20px 48px 96px' }}>
-        {/* Title */}
         <div style={{ marginBottom: 28 }}>
-          <Badge tone="soft" icon="file-text">Confluence</Badge>
+          <span style={{
+            display: 'inline-block', fontSize: 11, fontWeight: 600, padding: '2px 8px',
+            borderRadius: 4, background: C.bgSoft, color: C.muted, marginBottom: 12,
+            textTransform: 'uppercase', letterSpacing: '0.04em',
+          }}>Confluence</span>
           <h1 style={{ margin: '12px 0 8px', fontSize: 36, fontWeight: 600, color: C.fg, letterSpacing: '-0.015em', lineHeight: 1.15 }}>
             {doc.title}
           </h1>
@@ -226,7 +227,6 @@ function KbDoc({ doc, loading }) {
           </div>
         </div>
 
-        {/* Tags */}
         {doc.tags && doc.tags.length > 0 && (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 24 }}>
             {doc.tags.map(t => (
@@ -238,7 +238,6 @@ function KbDoc({ doc, loading }) {
           </div>
         )}
 
-        {/* Content */}
         <div style={{ fontSize: 15, color: C.body, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
           {doc.content || <span style={{ color: C.muted, fontStyle: 'italic' }}>No content</span>}
         </div>
@@ -247,7 +246,7 @@ function KbDoc({ doc, loading }) {
   )
 }
 
-// ─── Right sidebar ────────────────────────────────────────────
+// ─── Right sidebar (no Icon/useLucide) ────────────────────────
 function KbDocSide({ doc }) {
   return (
     <aside style={{ width: 260, padding: '24px 16px', borderLeft: `1px solid ${C.border}`, background: '#FFFFFF', overflowY: 'auto' }}>
@@ -284,7 +283,7 @@ function KbDocSide({ doc }) {
               <Eyebrow>Source</Eyebrow>
               <a href={doc.url} target="_blank" rel="noopener noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 12, color: C.purple, textDecoration: 'none' }}>
-                <Icon name="external-link" size={12} /> View in Confluence
+                ↗ View in Confluence
               </a>
             </div>
           )}
