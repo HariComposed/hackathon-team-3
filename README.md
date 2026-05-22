@@ -60,7 +60,7 @@ composed-tokens.css # Design tokens
 
 No build step required. Open any `.html` file directly in a browser:
 
-- `Composed Compose - standalone.html` — full self-contained prototype
+- `index.html` — full self-contained prototype (served as homepage on Vercel)
 - `Composed Compose - hi-fi.html` — hi-fi version
 - `Composed Claude wireframes.html` — wireframe explorations
 
