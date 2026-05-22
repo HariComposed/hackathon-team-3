@@ -3,11 +3,11 @@
 
 function App() {
   const [appNav, setAppNav] = React.useState('compose');
-  const [activeProjectId, setActiveProjectId] = React.useState(null);  // null → Setup
+  const [activeProjectId, setActiveProjectId] = React.useState('acme-cc');
   const [projectTab, setProjectTab] = React.useState('brief');
   const [handoffMode, setHandoffMode] = React.useState('hub');
   const [model, setModel] = React.useState('Claude Sonnet 4.5');
-  const [railCollapsed, setRailCollapsed] = React.useState(true);
+  const [railCollapsed, setRailCollapsed] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
 
@@ -50,7 +50,7 @@ function App() {
                     onOpenKnowledge={() => setAppNav('knowledge')}
                   />
                 )}
-                {projectTab === 'brief' && <Brief slashOpen onOpenKnowledge={() => setAppNav('knowledge')} />}
+                {projectTab === 'brief' && <Brief onOpenKnowledge={() => setAppNav('knowledge')} />}
                 {projectTab === 'prototype' && <Handoff mode={handoffMode} onMode={setHandoffMode} />}
                 {projectTab === 'share' && <ShareInline onOpenModal={() => setShareOpen(true)} />}
               </>
