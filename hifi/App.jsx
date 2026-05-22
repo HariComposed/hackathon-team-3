@@ -22,7 +22,7 @@ function App() {
   const newProject = () => setActiveProjectId(null);
 
   return (
-    <Shell app={appNav} onNavApp={setAppNav} model={model} onModel={setModel}>
+    <Shell app={appNav} onNavApp={setAppNav} onHome={() => setActiveProjectId(null)} model={model} onModel={setModel}>
       {appNav === 'compose' && (
         <>
           <ProjectsRail

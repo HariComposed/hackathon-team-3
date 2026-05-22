@@ -2,11 +2,11 @@
 // Composed wordmark · app nav (Compose / Knowledge primary, rest in a Tools menu)
 // search · model · notifications · profile.
 
-function Shell({ app, onNavApp, model, onModel, children }) {
+function Shell({ app, onNavApp, onHome, model, onModel, children }) {
   useLucide([]);
   return (
     <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', flexDirection: 'column' }}>
-      <TopNav app={app} onNavApp={onNavApp} model={model} onModel={onModel} />
+      <TopNav app={app} onNavApp={onNavApp} onHome={onHome} model={model} onModel={onModel} />
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>{children}</div>
     </div>
   );
@@ -23,7 +23,7 @@ const SECONDARY_APPS = [
   { id: 'settings',  label: 'Settings',  icon: 'settings' },
 ];
 
-function TopNav({ app, onNavApp, model, onModel }) {
+function TopNav({ app, onNavApp, onHome, model, onModel }) {
   const [toolsOpen, setToolsOpen] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [profileOpen, setProfileOpen] = React.useState(false);
@@ -41,7 +41,7 @@ function TopNav({ app, onNavApp, model, onModel }) {
       position: 'sticky', top: 0, zIndex: 50,
     }}>
       {/* Left: logo + primary nav */}
-      <a href="#" onClick={(e) => { e.preventDefault(); onNavApp('compose'); }}
+      <a href="#" onClick={(e) => { e.preventDefault(); onNavApp('compose'); onHome && onHome(); }}
         style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, textDecoration: 'none' }}>
         <img src="assets/logo-wordmark.svg" alt="Composed Digital" style={{ height: 24 }} />
       </a>
