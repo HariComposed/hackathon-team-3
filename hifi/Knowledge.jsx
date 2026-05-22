@@ -42,7 +42,7 @@ function Knowledge({ initialDocId = null }) {
       .finally(() => setDocLoading(false))
   }, [activeId])
 
-  useLucide([pages, activeId, doc, search, loading, docLoading])
+  useLucide([pages, activeId, search, loading])
 
   // Filter pages by search query
   const filtered = search.trim()
@@ -167,7 +167,7 @@ function KbTreeItem({ page, active, onSelect }) {
 
 // ─── Doc reader ───────────────────────────────────────────────
 function KbDoc({ doc, loading }) {
-  useLucide([doc, loading])
+  useLucide([loading])
 
   if (loading) {
     return (
