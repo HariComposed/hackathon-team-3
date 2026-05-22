@@ -1,7 +1,7 @@
 // Hi-fi: Brief tab — full-page document with slash menu.
 // Replaces the popover-on-selection pattern: now `/` triggers a Notion-style command menu.
 
-function Brief({ slashOpen = true, onOpenKnowledge }) {
+function Brief({ slashOpen = false, onOpenKnowledge }) {
   const [explainerOpen, setExplainerOpen] = React.useState(true);
   useLucide([slashOpen, explainerOpen]);
   return (
