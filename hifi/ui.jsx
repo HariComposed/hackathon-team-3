@@ -36,8 +36,24 @@ function useLucide(deps = []) {
   }, deps);
 }
 
+// Icon uses a dangerouslySetInnerHTML wrapper so React treats the inner DOM as
+// opaque. This prevents React's reconciler from conflicting with Lucide's SVG
+// replacement, which caused the insertBefore crash when Lucide mutated nodes
+// that React still held references to.
 function Icon({ name, size = 16, stroke = 2, color, style }) {
-  return <i data-lucide={name} width={size} height={size} strokeWidth={stroke} style={{ color, ...style }}></i>;
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (ref.current && window.lucide) {
+      window.lucide.createIcons({ el: ref.current });
+    }
+  });
+  return (
+    <span
+      ref={ref}
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color, ...style }}
+      dangerouslySetInnerHTML={{ __html: `<i data-lucide="${name}" width="${size}" height="${size}" stroke-width="${stroke}"></i>` }}
+    />
+  );
 }
 
 function Btn({ variant = 'primary', size = 'md', icon, iconRight, children, onClick, fullWidth, disabled, style }) {
