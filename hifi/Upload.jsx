@@ -1,13 +1,38 @@
 // Hi-fi: Knowledge upload flow — drag-drop / paste / type → Claude pre-fills metadata → user reviews.
 // Surfaces as a modal from the Knowledge app or any "+ Upload" button.
 
-function UploadModal({ open, onClose }) {
+const KB_URL  = 'https://qignvmxqgwpgzdoughcf.supabase.co'
+const KB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpZ252bXhxZ3dwZ3pkb3VnaGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNzg5NzcsImV4cCI6MjA5NDk1NDk3N30.EkfZfNKKj-WAM21T6tDusPsAuySFu9dfAnhPqYIOKp8'
+
+async function kbInsert(row) {
+  const res = await fetch(`${KB_URL}/rest/v1/knowledge`, {
+    method: 'POST',
+    headers: {
+      apikey: KB_ANON,
+      Authorization: `Bearer ${KB_ANON}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(row),
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Supabase ${res.status}: ${err}`)
+  }
+  return res.json()
+}
+
+function UploadModal({ open, onClose, onPublished }) {
   const [step, setStep] = React.useState('intake');  // 'intake' | 'review' | 'done'
   const [source, setSource] = React.useState('files');  // 'files' | 'link' | 'paste' | 'capture'
+  const [stagedFiles, setStagedFiles] = React.useState([])   // { name, content, size }
+  const [pasteText, setPasteText] = React.useState('')
 
   useLucide([open, step, source]);
 
   if (!open) return null;
+
+  const handleClose = () => { setStep('intake'); setStagedFiles([]); setPasteText(''); onClose() }
 
   return (
     <div style={{
@@ -15,18 +40,33 @@ function UploadModal({ open, onClose }) {
       backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
       zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
       padding: '64px 32px', overflowY: 'auto',
-    }} onClick={onClose}>
+    }} onClick={handleClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: '100%', maxWidth: 880, background: '#FFFFFF',
         borderRadius: 20, boxShadow: '0 24px 64px rgba(0,0,0,.20)',
         display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 128px)',
         fontFamily: 'Poppins, sans-serif',
       }}>
-        <UploadHeader step={step} onClose={onClose} onBack={() => setStep('intake')} />
+        <UploadHeader step={step} onClose={handleClose} onBack={() => setStep('intake')} />
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {step === 'intake' && <UploadIntake source={source} onSource={setSource} onNext={() => setStep('review')} />}
-          {step === 'review' && <UploadReview onBack={() => setStep('intake')} onPublish={() => setStep('done')} />}
-          {step === 'done' && <UploadDone onClose={onClose} />}
+          {step === 'intake' && (
+            <UploadIntake
+              source={source} onSource={setSource}
+              stagedFiles={stagedFiles} onStagedFiles={setStagedFiles}
+              pasteText={pasteText} onPasteText={setPasteText}
+              onNext={() => setStep('review')}
+            />
+          )}
+          {step === 'review' && (
+            <UploadReview
+              stagedFiles={stagedFiles}
+              pasteText={pasteText}
+              source={source}
+              onBack={() => setStep('intake')}
+              onPublish={() => { setStep('done'); onPublished && onPublished() }}
+            />
+          )}
+          {step === 'done' && <UploadDone onClose={handleClose} />}
         </div>
       </div>
     </div>
@@ -82,7 +122,11 @@ function UploadHeader({ step, onClose, onBack }) {
 }
 
 // ─── Step 1 — Intake ───────────────────────────────────────────
-function UploadIntake({ source, onSource, onNext }) {
+function UploadIntake({ source, onSource, stagedFiles, onStagedFiles, pasteText, onPasteText, onNext }) {
+  const canProceed = source === 'files' ? stagedFiles.length > 0
+    : source === 'paste' ? pasteText.trim().length > 0
+    : true  // link/capture always allow next (demo)
+
   return (
     <div style={{ padding: '24px 28px 28px' }}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -96,9 +140,9 @@ function UploadIntake({ source, onSource, onNext }) {
         ))}
       </div>
 
-      {source === 'files' && <FilesIntake />}
+      {source === 'files' && <FilesIntake stagedFiles={stagedFiles} onStagedFiles={onStagedFiles} />}
       {source === 'link' && <LinkIntake />}
-      {source === 'paste' && <PasteIntake />}
+      {source === 'paste' && <PasteIntake value={pasteText} onChange={onPasteText} />}
       {source === 'capture' && <CaptureIntake />}
 
       <div style={{
@@ -123,7 +167,7 @@ function UploadIntake({ source, onSource, onNext }) {
           <Icon name="shield-check" size={12} />
           Client docs auto-restrict to the client team. PII gets scanned and flagged.
         </span>
-        <Btn variant="primary" iconRight="arrow-right" onClick={onNext}>
+        <Btn variant="primary" iconRight="arrow-right" onClick={onNext} disabled={!canProceed}>
           Process &amp; review
         </Btn>
       </div>
@@ -161,15 +205,67 @@ function SourceTab({ id, icon, label, sub, selected, onClick }) {
   );
 }
 
-function FilesIntake() {
+function FilesIntake({ stagedFiles, onStagedFiles }) {
+  const handleFiles = (files) => {
+    Array.from(files).forEach(f => {
+      const sizeLabel = f.size < 1024 * 1024
+        ? (f.size / 1024).toFixed(0) + ' KB'
+        : (f.size / (1024 * 1024)).toFixed(1) + ' MB'
+      const icon = f.name.endsWith('.pdf') ? 'file-text'
+        : f.name.endsWith('.md') ? 'file-code-2'
+        : f.name.endsWith('.csv') ? 'sheet'
+        : 'file'
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        onStagedFiles(prev => [
+          ...prev,
+          { name: f.name, size: sizeLabel, content: e.target.result || '', icon, status: 'ready' }
+        ])
+      }
+      // Read as text for text files, otherwise just store name
+      if (f.type.startsWith('text/') || f.name.match(/\.(md|txt|csv|json|jsx|js|ts|tsx|html|css)$/i)) {
+        reader.readAsText(f)
+      } else {
+        // For binary files (PDF etc) we can't read content in browser — store placeholder
+        reader.onload = null
+        onStagedFiles(prev => [
+          ...prev,
+          { name: f.name, size: sizeLabel, content: `[Binary file: ${f.name}]`, icon, status: 'ready' }
+        ])
+      }
+    })
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files)
+  }
+
+  const handleChange = (e) => {
+    if (e.target.files && e.target.files.length) handleFiles(e.target.files)
+    e.target.value = ''
+  }
+
+  const removeFile = (idx) => onStagedFiles(prev => prev.filter((_, i) => i !== idx))
+
   return (
     <>
-      <div style={{
-        border: `2px dashed ${C.borderStrong}`, borderRadius: 16,
-        padding: '40px 24px', background: C.bg,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-        textAlign: 'center',
-      }}>
+      <label
+        onDragOver={e => e.preventDefault()}
+        onDrop={handleDrop}
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          border: `2px dashed ${C.borderStrong}`, borderRadius: 16,
+          padding: '40px 24px', background: C.bg,
+          textAlign: 'center', cursor: 'pointer',
+        }}>
+        <input
+          type="file"
+          multiple
+          accept=".pdf,.doc,.docx,.md,.csv,.pptx,.txt,.png,.jpg,.js,.jsx,.ts,.tsx,.html,.json"
+          style={{ display: 'none' }}
+          onChange={handleChange}
+        />
         <div style={{
           width: 56, height: 56, borderRadius: 14,
           background: 'rgba(108,92,231,.10)', color: C.purple,
@@ -178,24 +274,34 @@ function FilesIntake() {
           <Icon name="file-up" size={28} />
         </div>
         <div style={{ fontSize: 16, fontWeight: 600, color: C.fg }}>Drop files here, or click to browse</div>
-        <div style={{ fontSize: 12, color: C.muted }}>PDF · docx · md · csv · pptx · txt · &lt; 25 MB each</div>
-        <Btn variant="secondary" size="sm" icon="folder-open" style={{ marginTop: 8 }}>Choose files</Btn>
-      </div>
+        <div style={{ fontSize: 12, color: C.muted }}>PDF · docx · md · csv · txt · and more</div>
+        <span style={{
+          marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+          height: 32, padding: '0 12px', borderRadius: 8,
+          border: `1px solid ${C.border}`, background: '#fff',
+          fontSize: 13, fontWeight: 500, color: C.fg,
+        }}>
+          Choose files
+        </span>
+      </label>
 
-      {/* Already-staged files */}
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Staged · 3 files</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <StagedFile name="Acme — Q2 brand brief.pdf" size="2.4 MB" status="processing" progress={62} icon="file-text" />
-          <StagedFile name="discovery-notes-2026-05.md" size="18 KB" status="ready" icon="file-code-2" />
-          <StagedFile name="canvas-audit-export.csv" size="412 KB" status="ready" icon="sheet" />
+      {stagedFiles.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Staged · {stagedFiles.length} file{stagedFiles.length !== 1 ? 's' : ''}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {stagedFiles.map((f, idx) => (
+              <StagedFile key={idx} name={f.name} size={f.size} status={f.status} icon={f.icon} onRemove={() => removeFile(idx)} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
 
-function StagedFile({ name, size, status, progress, icon }) {
+function StagedFile({ name, size, status, progress, icon, onRemove }) {
   return (
     <div style={{
       padding: 12, borderRadius: 10,
@@ -224,7 +330,7 @@ function StagedFile({ name, size, status, progress, icon }) {
       ) : (
         <Badge tone="ok" size="sm" icon="check">Ready</Badge>
       )}
-      <IconBtn icon="x" label="Remove" size={28} />
+      <IconBtn icon="x" label="Remove" size={28} onClick={onRemove} />
     </div>
   );
 }
@@ -274,7 +380,7 @@ function LinkIntake() {
   );
 }
 
-function PasteIntake() {
+function PasteIntake({ value, onChange }) {
   return (
     <div style={{
       border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', background: '#FFFFFF',
@@ -287,12 +393,15 @@ function PasteIntake() {
         Paste a transcript, snippet, or notes
       </div>
       <textarea
-        defaultValue={`Acme weekly · 19 May 2026\n\nBrand team wants to test Content Cards alongside existing email canvases. Pilot to new users only. Activation goal: +8% over 60 days. Concerns: iOS analytics gap, audience overlap with existing welcome series.`}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Paste your content here…"
         rows={8}
         style={{
           width: '100%', border: 0, outline: 'none',
           padding: 14, fontFamily: 'JetBrains Mono, ui-monospace, monospace',
           fontSize: 13, color: C.fg, lineHeight: 1.6, resize: 'vertical',
+          boxSizing: 'border-box',
         }}
       />
     </div>
@@ -322,14 +431,67 @@ function CaptureIntake() {
 }
 
 // ─── Step 2 — Review ──────────────────────────────────────────
-function UploadReview({ onBack, onPublish }) {
+function UploadReview({ stagedFiles, pasteText, source, onBack, onPublish }) {
+  // Build items list from real data
+  const items = React.useMemo(() => {
+    if (source === 'paste' && pasteText.trim()) {
+      const firstLine = pasteText.trim().split('\n')[0].slice(0, 60)
+      return [{ name: firstLine || 'Pasted text', content: pasteText.trim(), isPaste: true }]
+    }
+    return stagedFiles.length > 0 ? stagedFiles : [{ name: 'Demo — Acme Q2 brief', content: 'Demo content for presentation.', isDemo: true }]
+  }, [stagedFiles, pasteText, source])
+
+  const [idx, setIdx] = React.useState(0)
+  const current = items[idx] || items[0]
+
+  const [title, setTitle] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState(null)
+  const [published, setPublished] = React.useState([])
+
+  // Auto-fill title from filename/first line when item changes
+  React.useEffect(() => {
+    if (!current) return
+    const base = current.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ')
+    setTitle(base)
+  }, [idx, current && current.name])
+
+  const handlePublishOne = async () => {
+    if (!current) return
+    setSaving(true); setError(null)
+    try {
+      await kbInsert({
+        title: title || current.name,
+        content: current.content || '',
+        author: 'Uploaded',
+        tags: [],
+        updated_at: new Date().toISOString(),
+      })
+      setPublished(prev => [...prev, idx])
+      if (idx + 1 < items.length) {
+        setIdx(i => i + 1)
+      } else {
+        onPublish()
+      }
+    } catch(e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!current) return null
+  const remaining = items.length - published.length
+  const preview = (current.content || '').slice(0, 400)
+
   return (
     <div style={{ padding: '24px 28px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <Eyebrow>Review · 1 of 3</Eyebrow>
-        <Badge tone="brand" size="sm" icon="sparkles">Claude prefilled</Badge>
+        <Eyebrow>Review · {idx + 1} of {items.length}</Eyebrow>
         <div style={{ flex: 1 }} />
-        <Btn variant="ghost" size="sm">Skip this one</Btn>
+        {items.length > 1 && idx + 1 < items.length && (
+          <Btn variant="ghost" size="sm" onClick={() => { setPublished(p => [...p, idx]); setIdx(i => i + 1) }}>Skip</Btn>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 16 }}>
@@ -338,145 +500,69 @@ function UploadReview({ onBack, onPublish }) {
           background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 16,
           padding: 20, display: 'flex', flexDirection: 'column', gap: 16,
         }}>
-          <FormField label="Title" hint="Claude's suggestion · edit to taste">
-            <input defaultValue="Acme — Braze CC audit · Q2 2026"
+          <FormField label="Title" hint="Edit to taste">
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
               style={{
                 width: '100%', height: 38, padding: '0 12px',
                 border: `1px solid ${C.border}`, borderRadius: 8, background: '#FFFFFF',
                 fontFamily: 'Poppins, sans-serif', fontSize: 14, fontWeight: 500, color: C.fg, outline: 'none',
+                boxSizing: 'border-box',
               }}
             />
           </FormField>
 
-          <FormField label="Summary" hint="2-sentence overview · used in search results">
-            <textarea
-              defaultValue={'Audit of Acme\'s Braze configuration ahead of Content Cards rollout. Confirms IP warming complete, dedicated sender stable, and identifies audience overlap with the existing welcome canvas.'}
-              rows={3}
-              style={{
-                width: '100%', padding: '10px 12px',
-                border: `1px solid ${C.border}`, borderRadius: 8, background: '#FFFFFF',
-                fontFamily: 'Poppins, sans-serif', fontSize: 13, color: C.body, lineHeight: 1.55,
-                outline: 'none', resize: 'vertical',
-              }}
-            />
-          </FormField>
-
-          <FormField label="File it under">
-            <FolderPicker />
-          </FormField>
-
-          <FormField label="Labels">
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 8, border: `1px solid ${C.border}`, borderRadius: 8, background: C.bg }}>
-              {['acme', 'braze', 'audit', 'content-cards', '2026'].map(t => (
-                <span key={t} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, padding: '2px 8px', borderRadius: 4,
-                  background: '#FFFFFF', color: C.body, border: `1px solid ${C.border}`,
-                }}>
-                  #{t}
-                  <Icon name="x" size={10} color={C.mutedLight} />
-                </span>
-              ))}
-              <span style={{ fontSize: 12, color: C.muted, padding: '2px 4px' }}>+ add</span>
+          <FormField label="Content preview">
+            <div style={{
+              padding: '10px 12px', borderRadius: 8, border: `1px solid ${C.border}`,
+              background: C.bg, fontSize: 12, color: C.muted, lineHeight: 1.6,
+              maxHeight: 160, overflowY: 'auto', fontFamily: 'JetBrains Mono, monospace',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            }}>
+              {preview || '(no text content)'}
+              {(current.content || '').length > 400 && <span style={{ color: C.mutedLight }}> …</span>}
             </div>
           </FormField>
 
-          <FormField label="Visible to">
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Chip selected size="sm" icon="building-2">Acme team (4)</Chip>
-              <Chip size="sm" icon="users">All Composed</Chip>
-              <Chip size="sm" icon="lock">Just me</Chip>
+          {error && (
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: '#fff3f3', border: '1px solid #fecaca', fontSize: 12, color: '#dc2626' }}>
+              {error}
             </div>
-          </FormField>
+          )}
         </div>
 
-        {/* Side panel — Claude insights */}
+        {/* Side info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Preview */}
           <div style={{
-            background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden',
-          }}>
-            <div style={{ padding: '10px 14px', borderBottom: `1px solid ${C.rule}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="file-text" size={13} color={C.muted} />
-              <span style={{ fontSize: 12, fontWeight: 500, color: C.fg, flex: 1 }}>Acme — Q2 brand brief.pdf</span>
-              <span style={{ fontSize: 11, color: C.muted }}>p. 1 of 14</span>
-            </div>
-            <div style={{ padding: 14, fontSize: 11, color: C.muted, lineHeight: 1.7, background: '#FAFAFA', maxHeight: 180, overflow: 'hidden', position: 'relative' }}>
-              Acme Co · Brand audit and Content Cards readiness · May 2026<br/><br/>
-              <strong style={{ color: C.fg }}>Executive summary</strong><br/>
-              The brand team is preparing to expand into in-app discovery via Braze Content Cards. This document audits the current Braze setup, recommends a phased rollout, and identifies dependencies in the existing canvas program…<br/><br/>
-              <em>14 pages · 4,260 words · 3 images</em>
-              <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 60, background: 'linear-gradient(180deg, transparent, #FAFAFA)' }} />
-            </div>
-          </div>
-
-          {/* Duplicates */}
-          <div style={{
-            background: '#FFFFFF', border: `1px solid ${C.warn}40`, borderRadius: 14,
+            background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 14,
             padding: 14, display: 'flex', flexDirection: 'column', gap: 8,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="alert-triangle" size={14} color={C.warn} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.fg }}>Possible duplicate</div>
-            </div>
-            <div style={{ fontSize: 12, color: C.body, lineHeight: 1.55 }}>
-              <strong>Acme — Braze audit · Feb 2026</strong> already exists. 78% content overlap. Want to <a href="#" style={{ color: C.purple, fontWeight: 500 }}>replace</a> or <a href="#" style={{ color: C.purple, fontWeight: 500 }}>archive the old one</a>?
-            </div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: C.muted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>File info</div>
+            <div style={{ fontSize: 13, color: C.fg, fontWeight: 500 }}>{current.name}</div>
+            {current.size && <div style={{ fontSize: 12, color: C.muted }}>{current.size}</div>}
+            <div style={{ fontSize: 12, color: C.muted }}>{(current.content || '').length.toLocaleString()} chars</div>
           </div>
 
-          {/* Sensitive content */}
           <div style={{
-            background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 14,
-            padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+            padding: 14, borderRadius: 14, background: 'rgba(108,92,231,.04)', border: `1px solid rgba(108,92,231,.18)`,
+            display: 'flex', flexDirection: 'column', gap: 6,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Icon name="shield-check" size={14} color={C.ok} />
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.fg }}>PII scan</div>
-              <div style={{ flex: 1 }} />
-              <Badge tone="ok" size="sm">Clean</Badge>
-            </div>
-            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55 }}>
-              No emails, phone numbers, or payment data found. Two API keys masked automatically.
-            </div>
-          </div>
-
-          {/* Related */}
-          <div style={{
-            background: '#FFFFFF', border: `1px solid ${C.border}`, borderRadius: 14,
-            padding: 14,
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: C.muted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-              Cross-link to
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {[
-                ['Acme — Braze setup', 'Client doc'],
-                ['Braze · Content Cards', 'Platform doc'],
-                ['Acme · Braze CC project', 'Active brief'],
-              ].map(([t, k]) => (
-                <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6 }}>
-                  <span style={{
-                    width: 14, height: 14, borderRadius: 4,
-                    background: C.purple, border: `1.5px solid ${C.purple}`,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon name="check" size={9} stroke={3} color="#fff" />
-                  </span>
-                  <span style={{ fontSize: 12, color: C.fg, fontWeight: 500, flex: 1 }}>{t}</span>
-                  <span style={{ fontSize: 10, color: C.muted }}>{k}</span>
-                </label>
-              ))}
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.fg }}>Where it goes</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+              Saved to the <strong style={{ color: C.fg }}>Acme Co</strong> knowledge section. Visible in the Knowledge sidebar immediately after publishing.
             </div>
           </div>
         </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
-        <Btn variant="ghost" icon="arrow-left" onClick={onBack}>Back</Btn>
+        <Btn variant="ghost" icon="arrow-left" onClick={onBack} disabled={saving}>Back</Btn>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: C.muted }}>2 more to review →</span>
-          <Btn variant="secondary">Save draft</Btn>
-          <Btn variant="primary" icon="check" onClick={onPublish}>Publish to knowledge</Btn>
+          {remaining > 1 && <span style={{ fontSize: 12, color: C.muted }}>{remaining - 1} more after this →</span>}
+          <Btn variant="primary" icon={saving ? 'loader-circle' : 'check'} onClick={handlePublishOne} disabled={saving || !title.trim()}>
+            {saving ? 'Saving…' : (idx + 1 < items.length ? 'Save & next' : 'Publish to knowledge')}
+          </Btn>
         </div>
       </div>
     </div>

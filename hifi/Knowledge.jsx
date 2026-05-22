@@ -187,6 +187,196 @@ function KbTreeItem({ label, active, onSelect, icon = 'file-text', badge }) {
   )
 }
 
+// ─── Lightweight markdown renderer ────────────────────────────
+function renderInline(text) {
+  // Bold, italic, inline code — returns array of React nodes
+  const parts = []
+  let i = 0, buf = ''
+  while (i < text.length) {
+    if (text[i] === '`') {
+      const end = text.indexOf('`', i + 1)
+      if (end !== -1) {
+        if (buf) parts.push(buf); buf = ''
+        parts.push(<code key={i} style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.88em', background: 'rgba(108,92,231,.08)', color: '#6c5ce7', padding: '1px 5px', borderRadius: 3 }}>{text.slice(i+1, end)}</code>)
+        i = end + 1; continue
+      }
+    }
+    if (text[i] === '*' && text[i+1] === '*') {
+      const end = text.indexOf('**', i + 2)
+      if (end !== -1) {
+        if (buf) parts.push(buf); buf = ''
+        parts.push(<strong key={i} style={{ fontWeight: 600, color: '#2d3436' }}>{text.slice(i+2, end)}</strong>)
+        i = end + 2; continue
+      }
+    }
+    if (text[i] === '_' && text[i+1] === '_') {
+      const end = text.indexOf('__', i + 2)
+      if (end !== -1) {
+        if (buf) parts.push(buf); buf = ''
+        parts.push(<strong key={i} style={{ fontWeight: 600 }}>{text.slice(i+2, end)}</strong>)
+        i = end + 2; continue
+      }
+    }
+    if (text[i] === '*' && text[i+1] !== '*') {
+      const end = text.indexOf('*', i + 1)
+      if (end !== -1) {
+        if (buf) parts.push(buf); buf = ''
+        parts.push(<em key={i}>{text.slice(i+1, end)}</em>)
+        i = end + 1; continue
+      }
+    }
+    buf += text[i]; i++
+  }
+  if (buf) parts.push(buf)
+  return parts
+}
+
+function MarkdownContent({ content }) {
+  if (!content) return <span style={{ color: '#b2bec3', fontStyle: 'italic' }}>No content</span>
+
+  const lines = content.split('\n')
+  const nodes = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Fenced code block
+    if (line.trimStart().startsWith('```')) {
+      const lang = line.trim().slice(3).trim()
+      const codeLines = []
+      i++
+      while (i < lines.length && !lines[i].trimStart().startsWith('```')) {
+        codeLines.push(lines[i]); i++
+      }
+      nodes.push(
+        <pre key={i} style={{
+          background: '#f8f7ff', border: '1px solid rgba(108,92,231,.15)',
+          borderRadius: 8, padding: '14px 18px', margin: '20px 0',
+          overflowX: 'auto', fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 13, lineHeight: 1.6, color: '#2d3436',
+        }}>
+          {lang && <div style={{ fontSize: 10, color: '#b2bec3', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{lang}</div>}
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      )
+      i++; continue
+    }
+
+    // Headings
+    const h3 = line.match(/^### (.+)/)
+    if (h3) {
+      nodes.push(<h3 key={i} style={{ fontSize: 16, fontWeight: 600, color: '#2d3436', margin: '28px 0 8px', letterSpacing: '-0.01em' }}>{renderInline(h3[1])}</h3>)
+      i++; continue
+    }
+    const h2 = line.match(/^## (.+)/)
+    if (h2) {
+      nodes.push(
+        <h2 key={i} style={{ fontSize: 20, fontWeight: 600, color: '#2d3436', margin: '36px 0 10px', letterSpacing: '-0.02em', paddingBottom: 8, borderBottom: '1px solid #f0eeff' }}>
+          {renderInline(h2[1])}
+        </h2>
+      )
+      i++; continue
+    }
+    const h1 = line.match(/^# (.+)/)
+    if (h1) {
+      nodes.push(<h1 key={i} style={{ fontSize: 26, fontWeight: 700, color: '#2d3436', margin: '0 0 16px', letterSpacing: '-0.02em' }}>{renderInline(h1[1])}</h1>)
+      i++; continue
+    }
+
+    // Horizontal rule
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      nodes.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid #f0eeff', margin: '28px 0' }} />)
+      i++; continue
+    }
+
+    // Blockquote
+    if (line.startsWith('> ')) {
+      const qLines = []
+      while (i < lines.length && lines[i].startsWith('> ')) {
+        qLines.push(lines[i].slice(2)); i++
+      }
+      nodes.push(
+        <blockquote key={i} style={{
+          borderLeft: '3px solid #6c5ce7', margin: '16px 0',
+          paddingLeft: 16, color: '#636e72', fontStyle: 'italic',
+        }}>
+          {qLines.map((q, qi) => <p key={qi} style={{ margin: '4px 0' }}>{renderInline(q)}</p>)}
+        </blockquote>
+      )
+      continue
+    }
+
+    // Unordered list — collect consecutive list items
+    if (/^(\s*)([-*+]) /.test(line)) {
+      const items = []
+      while (i < lines.length && /^(\s*)([-*+]) /.test(lines[i])) {
+        const indent = lines[i].match(/^(\s*)/)[1].length
+        const text = lines[i].replace(/^\s*[-*+] /, '')
+        items.push({ indent, text, key: i })
+        i++
+      }
+      nodes.push(
+        <ul key={`ul-${i}`} style={{ margin: '12px 0', paddingLeft: 24, listStyle: 'disc' }}>
+          {items.map(it => (
+            <li key={it.key} style={{ margin: '4px 0', fontSize: 15, color: '#636e72', lineHeight: 1.7, marginLeft: it.indent * 8 }}>
+              {renderInline(it.text)}
+            </li>
+          ))}
+        </ul>
+      )
+      continue
+    }
+
+    // Ordered list
+    if (/^\d+\. /.test(line)) {
+      const items = []
+      while (i < lines.length && /^\d+\. /.test(lines[i])) {
+        items.push({ text: lines[i].replace(/^\d+\. /, ''), key: i }); i++
+      }
+      nodes.push(
+        <ol key={`ol-${i}`} style={{ margin: '12px 0', paddingLeft: 24, listStyle: 'decimal' }}>
+          {items.map(it => (
+            <li key={it.key} style={{ margin: '4px 0', fontSize: 15, color: '#636e72', lineHeight: 1.7 }}>
+              {renderInline(it.text)}
+            </li>
+          ))}
+        </ol>
+      )
+      continue
+    }
+
+    // Frontmatter-style key: value lines (common in standards docs)
+    if (/^[a-zA-Z_]+:\s+\S/.test(line) && !line.startsWith(' ')) {
+      const [k, ...vParts] = line.split(':')
+      const v = vParts.join(':').trim()
+      nodes.push(
+        <div key={i} style={{ display: 'flex', gap: 8, margin: '3px 0', fontSize: 14 }}>
+          <span style={{ color: '#b2bec3', fontWeight: 600, fontFamily: 'JetBrains Mono, monospace', fontSize: 12, minWidth: 100 }}>{k}</span>
+          <span style={{ color: '#636e72' }}>{renderInline(v)}</span>
+        </div>
+      )
+      i++; continue
+    }
+
+    // Blank line → spacing
+    if (line.trim() === '') {
+      nodes.push(<div key={i} style={{ height: 10 }} />)
+      i++; continue
+    }
+
+    // Normal paragraph
+    nodes.push(
+      <p key={i} style={{ margin: '0 0 2px', fontSize: 15, color: '#636e72', lineHeight: 1.75 }}>
+        {renderInline(line)}
+      </p>
+    )
+    i++
+  }
+
+  return <div style={{ paddingTop: 8 }}>{nodes}</div>
+}
+
 // ─── Doc reader (no Icon/useLucide — avoids DOM reconciler crash) ─────────────
 function KbDoc({ doc, loading }) {
   if (loading) {
@@ -266,9 +456,7 @@ function KbDoc({ doc, loading }) {
           </div>
         )}
 
-        <div style={{ fontSize: 15, color: C.body, lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
-          {doc.content || <span style={{ color: C.muted, fontStyle: 'italic' }}>No content</span>}
-        </div>
+        <MarkdownContent content={doc.content} />
       </article>
     </div>
   )

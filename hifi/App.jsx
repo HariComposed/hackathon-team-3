@@ -1,8 +1,13 @@
 // Hi-fi App — state + routing across the Compose, Knowledge apps and modals.
 // Default landing is the New project flow (no pinned conversation).
 
+function parseHash() {
+  const h = window.location.hash.replace('#', '') || 'compose'
+  return h
+}
+
 function App() {
-  const [appNav, setAppNav] = React.useState('compose');
+  const [appNav, setAppNavState] = React.useState(parseHash);
   const [activeProjectId, setActiveProjectId] = React.useState('acme-cc');
   const [projectTab, setProjectTab] = React.useState('brief');
   const [handoffMode, setHandoffMode] = React.useState('hub');
@@ -10,8 +15,22 @@ function App() {
   const [railCollapsed, setRailCollapsed] = React.useState(false);
   const [shareOpen, setShareOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [knowledgeRefreshKey, setKnowledgeRefreshKey] = React.useState(0);
 
   const activeProject = activeProjectId ? PROJECTS.find(p => p.id === activeProjectId) : null;
+
+  // Sync appNav → URL hash
+  const setAppNav = React.useCallback((nav) => {
+    window.location.hash = nav
+    setAppNavState(nav)
+  }, [])
+
+  // Browser back/forward → update appNav
+  React.useEffect(() => {
+    const onPop = () => setAppNavState(parseHash())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   useLucide([appNav, projectTab, handoffMode, railCollapsed, shareOpen, uploadOpen, activeProjectId]);
 
@@ -60,7 +79,7 @@ function App() {
       )}
 
       {appNav === 'knowledge' && (
-        <KnowledgeApp onUpload={() => setUploadOpen(true)} />
+        <KnowledgeApp key={knowledgeRefreshKey} onUpload={() => setUploadOpen(true)} />
       )}
 
       {appNav !== 'compose' && appNav !== 'knowledge' && (
@@ -68,7 +87,7 @@ function App() {
       )}
 
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} />
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
+      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} onPublished={() => { setUploadOpen(false); setKnowledgeRefreshKey(k => k + 1); setAppNav('knowledge'); }} />
 
       {(appNav === 'compose' || appNav === 'knowledge') && !uploadOpen && !shareOpen && (
         <FloatingFab onClick={() => setUploadOpen(true)} />
