@@ -1,0 +1,195 @@
+/* =============================================================
+   Composed Digital — Foundations
+   Colors, typography, spacing, radii, shadows
+   Single source of truth — import in every kit and slide.
+   ============================================================= */
+
+/* ---------- Fonts ---------- */
+/* Primary: Poppins  (300/400/500/600/700 — never 800/900) */
+/* Mono: JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ===== Brand palette ===== */
+  --purple:        #6C5CE7;
+  --purple-light:  #7C3AED;
+  --purple-dark:   #4F46E5;
+  --cyan:          #00D4FF;   /* dark theme only */
+  --cyan-lm:       #0891B2;   /* cyan on light */
+
+  /* Logo gradient stops (logo mark ONLY) */
+  --grad-logo-1:   #9D00FF;
+  --grad-logo-2:   #7BB1FD;
+
+  /* ===== Surfaces & text — light ===== */
+  --bg:            #FAFAFA;
+  --bg-card:       #FFFFFF;
+  --border:        #E7E7EE;
+  --border-strong: #D7D7E0;
+  --rule:          #ECECF1;
+  --fg:            #1A1A2E;
+  --fg-body:       #374151;
+  --fg-muted:      #6B7280;
+
+  /* ===== Surfaces & text — dark ===== */
+  --d-bg:          #0D0D1A;
+  --d-bg-2:        #121218;
+  --d-bg-card:     #1A1A2E;
+  --d-fg:          #F8F9FA;
+  --d-fg-muted:    #8B8B9A;
+  --d-border:      rgba(255,255,255,.08);
+
+  /* ===== Status ===== */
+  --ok:    #10B981;
+  --warn:  #F59E0B;
+  --err:   #EF4444;
+  --info:  #0891B2;
+
+  /* ===== Gradients ===== */
+  --grad-brand:    linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
+  --grad-logo:     linear-gradient(135deg, #9D00FF 0%, #7BB1FD 100%);
+  --grad-card-dk:  linear-gradient(180deg, #1A1A2E 0%, #121218 100%);
+
+  /* ===== Typography ===== */
+  --font-sans: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Type scale — px values */
+  --fs-hero:    64px;   /* Marketing hero only */
+  --fs-display: 48px;
+  --fs-h2c:     32px;   /* H2 compact, app screens */
+  --fs-h3:      24px;
+  --fs-h4:      18px;
+  --fs-body:    16px;
+  --fs-sm:      14px;
+  --fs-eyebrow: 12px;
+
+  /* Line heights */
+  --lh-hero:    1.05;
+  --lh-display: 1.10;
+  --lh-h2c:     1.20;
+  --lh-h3:      1.30;
+  --lh-h4:      1.40;
+  --lh-body:    1.60;
+  --lh-sm:      1.50;
+  --lh-eyebrow: 1.00;
+
+  /* ===== Spacing (4px base) ===== */
+  --xs:  4px;
+  --sm:  8px;
+  --md:  16px;
+  --lg:  24px;
+  --xl:  32px;
+  --2xl: 48px;
+  --3xl: 64px;
+  --4xl: 96px;
+
+  /* ===== Radii ===== */
+  --r-xs:   4px;   /* chips, tags */
+  --r-sm:   8px;   /* buttons, inputs */
+  --r-md:   12px;  /* small cards, icon tiles */
+  --r-lg:   16px;  /* cards */
+  --r-xl:   20px;  /* modals, hero blocks */
+  --r-full: 9999px;
+
+  /* ===== Shadows ===== */
+  --sh-sm:   0 1px 3px rgba(0,0,0,.10);
+  --sh-md:   0 4px 6px rgba(0,0,0,.10);
+  --sh-lg:   0 8px 24px rgba(108,92,231,.20);
+  --sh-glow: 0 0 40px rgba(108,92,231,.30);
+
+  /* ===== Layout ===== */
+  --max-content: 1200px;
+  --max-hero:    1280px;
+  --gutter:      24px;
+}
+
+/* ---------- Base ---------- */
+html, body {
+  font-family: var(--font-sans);
+  color: var(--fg-body);
+  background: var(--bg);
+  font-size: 16px;
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- Semantic typography classes ---------- */
+.t-hero, h1.hero {
+  font-family: var(--font-sans);
+  font-size: var(--fs-hero);
+  font-weight: 700;
+  line-height: var(--lh-hero);
+  color: var(--fg);
+  letter-spacing: -0.02em;
+}
+.t-display, h2.display {
+  font-size: var(--fs-display);
+  font-weight: 600;
+  line-height: var(--lh-display);
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+.t-h2c, h2 {
+  font-size: var(--fs-h2c);
+  font-weight: 600;
+  line-height: var(--lh-h2c);
+  color: var(--fg);
+}
+.t-h3, h3 {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: var(--lh-h3);
+  color: var(--fg);
+}
+.t-h4, h4 {
+  font-size: var(--fs-h4);
+  font-weight: 500;
+  line-height: var(--lh-h4);
+  color: var(--fg);
+}
+.t-body, p {
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: var(--lh-body);
+  color: var(--fg-body);
+}
+.t-sm, small {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-sm);
+  color: var(--fg-muted);
+}
+.t-eyebrow {
+  font-size: var(--fs-eyebrow);
+  font-weight: 500;
+  line-height: var(--lh-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--purple);
+}
+.t-stat {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 80px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+code, kbd, .t-mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* ---------- Utility ---------- */
+.surface-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.surface-card-dark {
+  background: var(--d-bg-card);
+  border: 1px solid var(--d-border);
+  border-radius: var(--r-lg);
+  color: var(--d-fg);
+}

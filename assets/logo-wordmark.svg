@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 56" width="260" height="56">
+  <defs>
+    <linearGradient id="wmGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9D00FF"></stop>
+      <stop offset="100%" stop-color="#7BB1FD"></stop>
+    </linearGradient>
+  </defs>
+  <g transform="translate(4,8)">
+    <rect x="0" y="0" width="18" height="18" rx="4" fill="url(#wmGrad)" opacity="0.35"></rect>
+    <rect x="6" y="6" width="18" height="18" rx="4" fill="url(#wmGrad)" opacity="0.65"></rect>
+    <rect x="12" y="12" width="18" height="18" rx="4" fill="url(#wmGrad)"></rect>
+  </g>
+  <text x="56" y="36" font-family="Poppins, system-ui, sans-serif" font-size="22" font-weight="600" fill="#1A1A2E" letter-spacing="-0.01em">Composed<tspan fill="#6C5CE7"> Digital</tspan></text>
+</svg>
