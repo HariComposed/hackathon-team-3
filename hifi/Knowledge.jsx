@@ -377,6 +377,25 @@ function MarkdownContent({ content }) {
   return <div style={{ paddingTop: 8 }}>{nodes}</div>
 }
 
+// ─── HTML content renderer — for Confluence-sourced HTML ──────
+function HtmlContent({ html }) {
+  return (
+    <div
+      className="kb-html-body"
+      dangerouslySetInnerHTML={{ __html: html }}
+      style={{ fontSize: 15, color: '#636e72', lineHeight: 1.75 }}
+    />
+  )
+}
+
+function DocContent({ content }) {
+  if (!content) return <span style={{ color: '#b2bec3', fontStyle: 'italic' }}>No content</span>
+  // Detect HTML: starts with a tag or contains common HTML entities/tags
+  const isHtml = /^[\s\n]*<[a-zA-Z]/.test(content) || /<(p|div|h[1-6]|ul|ol|li|table|br|strong|em|span)\b/i.test(content)
+  if (isHtml) return <HtmlContent html={content} />
+  return <MarkdownContent content={content} />
+}
+
 // ─── Doc reader (no Icon/useLucide — avoids DOM reconciler crash) ─────────────
 function KbDoc({ doc, loading }) {
   if (loading) {
@@ -456,7 +475,7 @@ function KbDoc({ doc, loading }) {
           </div>
         )}
 
-        <MarkdownContent content={doc.content} />
+        <DocContent content={doc.content} />
       </article>
     </div>
   )

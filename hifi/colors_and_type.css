@@ -193,3 +193,27 @@ code, kbd, .t-mono {
   border-radius: var(--r-lg);
   color: var(--d-fg);
 }
+
+/* ─── Knowledge HTML body (Confluence-sourced content) ─────── */
+.kb-html-body h1 { font-size: 26px; font-weight: 700; color: #2d3436; margin: 0 0 16px; letter-spacing: -0.02em; }
+.kb-html-body h2 { font-size: 20px; font-weight: 600; color: #2d3436; margin: 36px 0 10px; letter-spacing: -0.02em; padding-bottom: 8px; border-bottom: 1px solid #f0eeff; }
+.kb-html-body h3 { font-size: 16px; font-weight: 600; color: #2d3436; margin: 28px 0 8px; }
+.kb-html-body h4, .kb-html-body h5, .kb-html-body h6 { font-size: 14px; font-weight: 600; color: #2d3436; margin: 20px 0 6px; }
+.kb-html-body p  { margin: 0 0 10px; }
+.kb-html-body ul { margin: 12px 0; padding-left: 24px; list-style: disc; }
+.kb-html-body ol { margin: 12px 0; padding-left: 24px; list-style: decimal; }
+.kb-html-body li { margin: 4px 0; line-height: 1.7; }
+.kb-html-body a  { color: #6c5ce7; text-decoration: none; }
+.kb-html-body a:hover { text-decoration: underline; }
+.kb-html-body strong, .kb-html-body b { font-weight: 600; color: #2d3436; }
+.kb-html-body em, .kb-html-body i { font-style: italic; }
+.kb-html-body code { font-family: 'JetBrains Mono', monospace; font-size: 0.88em; background: rgba(108,92,231,.08); color: #6c5ce7; padding: 1px 5px; border-radius: 3px; }
+.kb-html-body pre { background: #f8f7ff; border: 1px solid rgba(108,92,231,.15); border-radius: 8px; padding: 14px 18px; margin: 20px 0; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.6; color: #2d3436; }
+.kb-html-body pre code { background: none; padding: 0; color: inherit; }
+.kb-html-body blockquote { border-left: 3px solid #6c5ce7; margin: 16px 0; padding-left: 16px; color: #636e72; font-style: italic; }
+.kb-html-body hr { border: none; border-top: 1px solid #f0eeff; margin: 28px 0; }
+.kb-html-body table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+.kb-html-body th { padding: 8px 12px; background: #f8f7ff; font-weight: 600; color: #2d3436; border: 1px solid #e8e4ff; text-align: left; }
+.kb-html-body td { padding: 8px 12px; border: 1px solid #f0eeff; color: #636e72; vertical-align: top; }
+.kb-html-body tr:nth-child(even) td { background: #fdfcff; }
+.kb-html-body img { max-width: 100%; border-radius: 6px; margin: 8px 0; }
